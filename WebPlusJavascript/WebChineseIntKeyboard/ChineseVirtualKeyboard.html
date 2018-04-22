@@ -1,0 +1,396 @@
+﻿
+<html>
+    <meta charset="utf-8">
+    <head>
+        <title>注音輸入法Keyboard</title>
+    
+		<script language="javascript">
+		</script>
+		<script src="js/jquery.min.js" type="text/javascript"></script>
+		<script src="js/jquery.mobile.min.js" type="text/javascript"></script>
+		<link href="docs/css/jquery-ui.min.css" rel="stylesheet">
+		<!-- still using jQuery v2.2.4 because Bootstrap doesn't support v3+ -->
+		<script src="docs/js/jquery-ui.min.js"></script>
+		<!-- <script src="docs/js/jquery-migrate-3.0.0.min.js"></script> -->
+
+		<!-- keyboard widget css & script (required) -->
+		<link href="css/keyboard.css" rel="stylesheet">
+		<script src="js/jquery.keyboard.js"></script>
+
+		<!-- keyboard extensions (optional) -->
+		<script src="js/jquery.mousewheel.js"></script>
+		<script src="js/jquery.keyboard.extension-typing.js"></script>
+		<script src="js/jquery.keyboard.extension-autocomplete.js"></script>
+		<script src="js/jquery.keyboard.extension-caret.js"></script>
+		
+		<script src="js/jquery-ui-1.10.3.custom.min.js" type="text/javascript"></script>
+		<script src="js/jquery.mousewheel.min.js" type="text/javascript"></script>
+		<script src="js/jquery.kinetic.min.js" type="text/javascript"></script>
+        <style>
+		#search{
+		   font-size: 1.8em;
+		   width: 20em;
+		   margin-left: auto;
+		   margin-right: auto;
+		}
+		#pinyinBuffer {
+		   position: relative;
+		   display:none;
+		   background-color: white;
+		   border: 1 solid;
+		   border-color: yellow;
+		   color: black;
+		   font-size: 1.8em;
+		   height: 1.8em;
+		   margin-top: 1em;
+		   margin-left: auto;
+		   margin-right: auto;
+		}
+		#chineseInputCandidateList {
+		   position: relative;
+		   font-size: 1.81em;
+		   height: 1.8em;
+		   margin-top: 1em;
+		   margin-left: auto;
+		   margin-right: auto;
+		   outline:none;
+		   overflow-y: hidden;
+     		 webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-o-user-select: none;
+			user-select: none;
+		}
+		#chineseInputCandidateList > div[name=candidateText] {
+		   background-color: black;
+		   display:inline-block;
+		   border: 1 solid;
+		   border-color: white;
+		   color: white;
+		   font-size: 1em;
+		   width: 1.81em;
+		   height: 1.81em;
+		   font-family: "標楷體";
+		   outline:none;
+		   cursor: hand;
+		   padding: 5px;
+		   text-align:center;
+		  -webkit-user-select: none;  /* Chrome all / Safari all */
+		  -moz-user-select: none;     /* Firefox all */
+		  -ms-user-select: none;      /* IE 10+ */
+		  user-select: none;  
+		}
+		div[name="search"]:focus{
+		  box-shadow: 0 0 0 2px;
+		  outline: none;
+		  background-color: rgb(255,255,224);
+		}
+		</style>
+    </head>
+    <body>
+        <div name="search" id="search" contenteditable="true"></div>
+		<div name="pinyinBuffer" id="pinyinBuffer" ></div>
+		<div name="chineseInputCandidateList" id="chineseInputCandidateList" ></div>
+    </body>
+    <script language="javascript">
+	   var inBoPoMoFo=false;
+	   var pinyinDic={};
+	   var bopomofoData=new Object();
+	   var VirtualKeyBoardChinese=null;
+	   var CreateVirtualKeyBoardChinese=function(){
+	       VirtualKeyBoardChinese=new Object();
+	       VirtualKeyBoardChinese.UpdateCandidatePanel=function(candidates,idx){
+		      console.log(candidates);
+			  var placeHolder=$('#chineseInputCandidateList');
+			  placeHolder.empty();
+			  var maxLen = candidates.length-idx;
+			  if(maxLen>10){
+			     maxLen=10;
+			  }
+			  if(candidates.length > 10){
+			     var btn=$('<div>');
+				 btn.attr('name','candidateText');
+				 btn.text('<');
+				 
+				 btn.click(function(){
+				    if(idx >= 10){
+				       VirtualKeyBoardChinese.UpdateCandidatePanel(candidates,idx-10);
+					}
+				 });
+				 placeHolder.append(btn);
+			  }
+			  for(var i=0; i<maxLen;++i){
+			     var btn=$('<div>');
+				 btn.attr('name','candidateText');
+				 btn.text(candidates[i+idx]);
+				 btn.click(function(){
+				    SearchKeyBoard.text(SearchKeyBoard.text()+$(this).text());
+					VirtualKeyBoardChinese.vocalComponents=[];
+					VirtualKeyBoardChinese.UpdateCandidateList();
+					$('#pinyinBuffer').text("");
+					adjustVocalWidth();
+				 });
+				 placeHolder.append(btn);
+			  }
+			  if(candidates.length > 10){
+			     var btn=$('<div>');
+				 btn.attr('name','candidateText');
+				 btn.text('>');
+				 
+				 btn.click(function(){
+				    if(idx + 10 < candidates.length){
+				       VirtualKeyBoardChinese.UpdateCandidatePanel(candidates,idx+10);
+					}
+				 });
+				 placeHolder.append(btn);
+			  }
+			  placeHolder.css('width',(1.81*placeHolder.children().length+5).toString()+"em");
+			  if(candidates.length > 0){
+			     placeHolder.show();
+			  }
+			  else{
+			     placeHolder.hide();
+			  }
+			  return candidates.length > 0;
+		   };
+		   VirtualKeyBoardChinese.vocalComponents=[];
+		   VirtualKeyBoardChinese.vocalPosDic={};
+		   VirtualKeyBoardChinese.VocalComponent=function(){
+			  var sret="";
+			  for (var i = 0; i < VirtualKeyBoardChinese.vocalComponents.length; ++i)
+			  {
+				 var s = VirtualKeyBoardChinese.vocalComponents[i];
+				 if (!s || s.trim().length==0) continue;
+				 sret+=s;
+			  }
+			  return sret;
+		   };
+		   VirtualKeyBoardChinese.UpdateCandidateList=function(){
+		        var candidate = VirtualKeyBoardChinese.GetCandidateList();
+				if(candidate.length == 0){
+				   if(VirtualKeyBoardChinese.VocalComponent().length==1){
+				      candidate=[VirtualKeyBoardChinese.VocalComponent()];
+				   }
+				}
+                return VirtualKeyBoardChinese.UpdateCandidatePanel(candidate,0);
+		   }
+		   var adjustVocalWidth=function(){
+		      var txt=VirtualKeyBoardChinese.VocalComponent();
+		      $('#pinyinBuffer').css('width',(1.81*txt.length)+"em");
+		   }
+		   VirtualKeyBoardChinese.OnBackPress=function(){
+				var vocalLength = VirtualKeyBoardChinese.VocalComponent().length;
+				for (var i = 3; i >= 0; --i)
+				{
+					if (VirtualKeyBoardChinese.vocalComponents[i]!=null && VirtualKeyBoardChinese.vocalComponents[i].trim().length != 0)
+					{
+						VirtualKeyBoardChinese.vocalComponents[i] = "";
+						break;
+					}
+				}
+				VirtualKeyBoardChinese.UpdateCandidateList();
+				adjustVocalWidth();
+				$('#pinyinBuffer').text(VirtualKeyBoardChinese.VocalComponent());
+				if (vocalLength == 0)
+				{
+					return false;
+				}
+				return true;
+		   }
+		   VirtualKeyBoardChinese.OnInput=function(txt){
+                if ((txt in VirtualKeyBoardChinese.vocalPosDic))
+                {
+                    var pos = VirtualKeyBoardChinese.vocalPosDic[txt];
+                    VirtualKeyBoardChinese.vocalComponents[pos] = txt;
+                }
+				adjustVocalWidth();
+				return VirtualKeyBoardChinese.UpdateCandidateList();
+		   };
+		   VirtualKeyBoardChinese.GetCandidateList=function()
+			{
+				var ret = [];
+				
+				var bopomofo = this.VocalComponent().trim();
+				ret = pinyinDic[bopomofo];
+				if(!ret){
+				   ret = [];
+				}
+				if (bopomofo.Length == 1)
+				{
+					ret.push(bopomofo);
+				}
+				return ret;
+			}
+		   //initVocalSet4
+		   {
+			   var vocal = [
+						" ",
+						"ˊ",
+						"ˇ",
+						"ˋ",
+						"˙"
+			   ];
+			   for (var i = 0; i < vocal.length; ++i)
+			   {
+				   var s = vocal[i];
+				   VirtualKeyBoardChinese.vocalPosDic[s] = 3;
+			   }
+		   }
+			//initVocalSet1()
+			{
+				var vocal = [
+					"ㄅ","ㄆ","ㄇ","ㄈ",
+					"ㄉ","ㄊ","ㄋ","ㄌ",
+					"ㄍ","ㄎ","ㄏ","ㄐ",
+					"ㄑ","ㄒ","ㄓ","ㄔ",
+					"ㄕ","ㄖ","ㄗ","ㄘ",
+					"ㄙ",
+					
+				];
+				for (var i = 0; i < vocal.length; ++i)
+			   {
+				   var s = vocal[i];
+				   VirtualKeyBoardChinese.vocalPosDic[s] = 0;
+			   }
+			}
+			//initVocalSet2()
+			{
+				var vocal = [
+					 "ㄧ","ㄨ","ㄩ"
+				];
+				for (var i = 0; i < vocal.length; ++i)
+			   {
+				   var s = vocal[i];
+				   VirtualKeyBoardChinese.vocalPosDic[s] = 1;
+			   }
+			}
+			//initVocalSet3()
+			{
+				var vocal = [
+					 "ㄚ","ㄛ","ㄜ","ㄝ",
+					 "ㄞ","ㄟ","ㄠ","ㄡ",
+					 "ㄢ","ㄣ","ㄤ","ㄥ",
+					 "ㄦ"
+				];
+				for (var i = 0; i < vocal.length; ++i)
+			   {
+				   var s = vocal[i];
+				   VirtualKeyBoardChinese.vocalPosDic[s] = 2;
+			   }
+			}
+	   };
+	   
+       $.ajax({
+	      url:'/pinyin.xml',
+		  dataType: 'xml',
+		  success: function(res){
+		     var data=res;
+			 var PinyinDics=data.getElementsByTagName('PinYinDic');
+			 for(var i=0; i<PinyinDics.length; ++i){
+			    var bopomoDic=PinyinDics[i];
+			    var bopomo=bopomoDic.getElementsByTagName('boPoMoFo')[0].textContent;
+			    var array=[];
+			    var candidateList=bopomoDic.getElementsByTagName('candidateList')[0].getElementsByTagName('string');
+			    for(var j=0; j<candidateList.length; ++j){
+		   		   array.push(candidateList[j].textContent);
+			    }
+			    pinyinDic[bopomo]=array;
+			 }
+			 CreateVirtualKeyBoardChinese();
+		  }
+	   });
+       var SearchKeyBoard=$('#search').keyboard({
+    usePreview: false, // disabled for contenteditable
+    useCombos: false,
+    autoAccept: true,
+    reposition: false,
+    alwaysOpen: true,
+    canceled: function(e,keyboard,el){
+        gSearchBar.text("");
+    },
+    accepted: function(e, keyboard, el) {
+	    console.log(gSearchBar.text());
+    },
+    visible: function(e,keyboard,el){
+		keyboard.$el.on('keyboardChange', function(event) {
+		  var keyset=keyboard.getKeySet();
+		  inBoPoMoFo= ('meta1' == keyset);
+		  if(inBoPoMoFo){
+		     $('#pinyinBuffer').show();
+			 $('#chineseInputCandidateList').show();
+		  }
+		  else{
+		     $('#pinyinBuffer').hide();
+			 $('#chineseInputCandidateList').hide();
+		  }
+		});
+	},
+	beforeInsert: function(e, keyboard, el, textToAdd) {
+	   if(inBoPoMoFo){
+	       
+		   if(VirtualKeyBoardChinese.OnInput(textToAdd)){
+			  
+		   }
+		   $('#pinyinBuffer').text(VirtualKeyBoardChinese.VocalComponent());
+		   return "";
+	   }
+	   else{
+	      return textToAdd;
+	   }
+    },
+    layout: 'custom',
+    css: {
+      input:'ui-widget-content ui-corner-all'
+    },
+    customLayout: {
+        'normal': [
+            '` 1 2 3 4 5 6 7 8 9 0 - = {del} {b}',
+            'q w e r t y u i o p [ ] \\',
+            'a s d f g h j k l ; \' ',
+            '{shift} z x c v b n m , . / {shift}',
+            '{meta1} {space} {left} {right}  {cancel} {accept}'
+        ],
+        'shift': [
+            '~ ! @ # $ % ^ & * ( ) _ + {del} {b}',
+            'Q W E R T Y U I O P { } |',
+            'A S D F G H J K L : " ',
+            '{shift} Z X C V B N M < > ? {shift}',
+            '{meta1} {space} {left} {right} {cancel}   {accept}'
+        ],
+		'meta1':[
+		   'ㄅ ㄉ ˇ ˋ ㄓ ˊ  ˙  ㄚ ㄞ ㄢ ㄦ {b}',
+		   'ㄆ ㄊ ㄍ ㄐ ㄔ ㄗ ㄧ ㄛ ㄟ ㄣ ',
+		   'ㄇ ㄋ ㄎ ㄑ ㄕ ㄘ ㄨ ㄜ ㄠ ㄤ ',
+		   'ㄈ ㄌ ㄏ ㄒ ㄖ ㄙ ㄩ ㄝ ㄡ ㄥ ',
+		   '{meta1} {space} {left} {right} {cancel}   {accept}'
+		]
+    },
+    display:{
+        'accept':' OK ',
+         'b': '\u2190:Backspace',
+		 'meta1': '注音ㄅ'
+    },
+    
+     // Used by jQuery UI position utility
+    position: {
+        of: $(window), // null = attach to input/textarea; use $(sel) to attach elsewhere
+        my: 'center bottom',
+        at: 'center bottom',
+        at2: 'center bottom' // used when "usePreview" is false
+    }
+}).addTyping();
+    $.extend($.keyboard.keyaction, {
+		bksp: function(base){
+		    console.log('bksp');
+			if(!VirtualKeyBoardChinese.OnBackPress()){
+		       var txt=SearchKeyBoard.text();
+			   if(txt)
+				SearchKeyBoard.text(txt.substring(0,txt.length-1));
+			}
+			return true;
+		}
+	});
+	
+    </script>
+
+</html>

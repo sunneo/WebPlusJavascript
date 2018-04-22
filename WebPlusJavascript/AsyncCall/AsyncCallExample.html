@@ -1,0 +1,140 @@
+<html>
+  <head>
+     <title>
+	    Example
+	 </title>
+  </head>
+  <body>
+  
+  </body>
+  <script language="javascript">
+       /**
+	    *  [ Web Front end ]  ---  [  C# Webkit  ] 
+		*                                +-------- [ Another Browser ]
+		*  
+		*  When WEB needs invoke script to another browser and wait for its result
+		*  Front end can regard a timer as callback invoker
+		*
+		*/
+       var AsyncCallStatusTable={};
+	   var TimerStatus="";
+	   
+	   var AsyncCallTimerInterval=300;
+	   var AsyncCallTimeoutInterval=5000;
+	   // for simulating WebkitBrowser
+	   var _asyncResult;
+	   var SetAsyncResult=function(res){
+	      _asyncResult=res;
+	   };
+	   
+	   var GetAsyncResult=function(){
+	      return _asyncResult;
+	   };
+	   
+	   var AsyncTimer=setInterval(function(){
+		   var status=TimerStatus;
+		   if(AsyncCallStatusTable[status]){
+			   var obj = AsyncCallStatusTable[status];
+			   obj.callback(obj);
+		   }
+       },AsyncCallTimerInterval);
+	   var AsyncCall=function(call,callBackObject)
+	   {
+	      var statusCode=Math.random().toString()+"CustomizedStatusCode";
+		   
+		   var objTrigger=new Object();
+		   objTrigger.statusCode=statusCode;
+		   objTrigger.callback=function(pthis)
+		   {
+		      var res = GetAsyncResult();
+			  var timerStatus=TimerStatus;
+		      if(res)
+			  {
+			     AsyncCallStatusTable[objTrigger.statusCode]=null;
+				 if(callBackObject.success)
+				 {
+			        callBackObject.success(res);
+				 }
+				 // if no nested async call, then reset the status
+				 if(timerStatus == TimerStatus)
+				 {
+				    TimerStatus="";
+				 }
+				 delete AsyncCallStatusTable[objTrigger.statusCode];
+			  }
+			  else
+			  {
+			     // if timeout occurred
+			     if(AsyncCallTimeoutInterval>0)
+				 {
+				    if(Date.now()-objTrigger.StartTime >= AsyncCallTimeoutInterval)
+					{
+					   if(callBackObject.error)
+					   {
+					      callBackObject.error('TIMEOUT');
+					   }
+					   if(timerStatus == TimerStatus)
+					   {
+				           TimerStatus="";
+				       }
+					}
+				 }
+			  }
+		   };
+		   objTrigger.StartTime=Date.now();
+		   AsyncCallStatusTable[statusCode]=objTrigger;
+	       TimerStatus = (statusCode);
+		   SetAsyncResult(null);
+		   // call user function
+		   try
+		   {
+		      call();
+		   }catch(err)
+		   {
+		      // call error if error occurred
+		      TimerStatus="";
+		      if(callBackObject.error)
+			  {
+				  callBackObject.error(err);
+			  }
+		   }
+	   }
+  /*
+     
+	   var WebkitBrowserPlugInInvoker=function(script,callback)
+	   {
+	       
+	       var statusCode=Math.random().toString()+"CustomizedStatusCode";
+		   
+		   var objTrigger=new Object();
+		   objTrigger.statusCode=statusCode;
+		   objTrigger.callback=function(pthis){
+		      if(WebkitBrowserPlugIn.getfacebookWebFormInvokeHasResult()){
+			     AsyncCallStatusTable[objTrigger.statusCode]=null;
+				 var res = WebkitBrowserPlugIn.getfacebookWebFormInvokeResult().toString();
+			     callback(res);
+			  }
+		   };
+		   AsyncCallStatusTable[statusCode]=objTrigger;
+	       WebkitBrowserPlugIn.setStatus(statusCode);
+		   WebkitBrowserPlugIn.facebookWebformInvoke(script);
+	   }
+	   var WebkitBrowserPlugInNavigator=function(url,callback)
+	   {
+	       var statusCode=Math.random().toString()+"CustomizedStatusCode";
+		   var objTrigger=new Object();
+		   objTrigger.statusCode=statusCode;
+		   objTrigger.callback=function(pthis){
+		      if(WebkitBrowserPlugIn.facebookWebformHasNavigated()){
+			     AsyncCallStatusTable[objTrigger.statusCode]=null;
+				 callback();
+			  }
+		   };
+		   AsyncCallStatusTable[statusCode]=objTrigger;
+		   WebkitBrowserPlugIn.facebookWebformNavigateTo(url);
+	       WebkitBrowserPlugIn.setStatus(statusCode);
+	   }
+   */
+
+  </script>
+</html>
